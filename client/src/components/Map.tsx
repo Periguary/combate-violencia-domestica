@@ -69,9 +69,9 @@
  *
  * -------------------------------
  * ✅ SUMMARY
- * - “map-attached” → AdvancedMarkerElement, DirectionsRenderer, Layers.
- * - “standalone” → Geocoder, DirectionsService, DistanceMatrixService, ElevationService.
- * - “data-only” → Place, Geometry utilities.
+ * - "map-attached" → AdvancedMarkerElement, DirectionsRenderer, Layers.
+ * - "standalone" → Geocoder, DirectionsService, DistanceMatrixService, ElevationService.
+ * - "data-only" → Place, Geometry utilities.
  */
 
 /// <reference types="@types/google.maps" />
@@ -109,21 +109,48 @@ function loadMapScript() {
   });
 }
 
+interface MapLocationData {
+  id: string;
+  name: string;
+  type: string;
+  lat: number;
+  lng: number;
+  address: string;
+  phone: string;
+  description: string;
+}
+
 interface MapViewProps {
   className?: string;
   initialCenter?: google.maps.LatLngLiteral;
   initialZoom?: number;
   onMapReady?: (map: google.maps.Map) => void;
+  locations?: MapLocationData[];
+  selectedLocation?: MapLocationData | null;
+  onLocationSelect?: (location: MapLocationData) => void;
 }
 
 export function MapView({
   className,
-  initialCenter = { lat: 37.7749, lng: -122.4194 },
-  initialZoom = 12,
+  initialCenter = { lat: -15.7942, lng: -48.0192 },
+  initialZoom = 4,
   onMapReady,
+  locations,
+  selectedLocation,
+  onLocationSelect,
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
+  const markers = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map());
+
+  const getMarkerColor = (type: string) => {
+    switch(type) {
+      case "deam": return "#dc2626"; // Soft Red
+      case "cras": return "#059669"; // Green
+      case "creas": return "#1e3a8a"; // Deep Blue
+      default: return "#6b7280";
+    }
+  };
 
   const init = usePersistFn(async () => {
     await loadMapScript();
@@ -149,7 +176,62 @@ export function MapView({
     init();
   }, [init]);
 
+  // Add markers when locations change
+  useEffect(() => {
+    if (!map.current || !window.google) return;
+
+    // Clear existing markers
+    markers.current.forEach(marker => marker.remove());
+    markers.current.clear();
+
+    // Add new markers
+    if (locations && locations.length > 0) {
+      locations.forEach(location => {
+        const markerElement = document.createElement("div");
+        markerElement.style.width = "32px";
+        markerElement.style.height = "32px";
+        markerElement.style.borderRadius = "50%";
+        markerElement.style.backgroundColor = getMarkerColor(location.type);
+        markerElement.style.border = "3px solid white";
+        markerElement.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
+        markerElement.style.cursor = "pointer";
+        markerElement.style.display = "flex";
+        markerElement.style.alignItems = "center";
+        markerElement.style.justifyContent = "center";
+        markerElement.style.fontSize = "16px";
+        markerElement.innerHTML = "📍";
+
+        const marker = new window.google.maps.marker.AdvancedMarkerElement({
+          map: map.current,
+          position: { lat: location.lat, lng: location.lng },
+          title: location.name,
+          content: markerElement,
+        });
+
+        marker.addListener("click", () => {
+          if (onLocationSelect) {
+            onLocationSelect(location);
+          }
+          // Center map on clicked marker
+          map.current?.setCenter({ lat: location.lat, lng: location.lng });
+          map.current?.setZoom(15);
+        });
+
+        markers.current.set(location.id, marker);
+      });
+    }
+  }, [locations, onLocationSelect]);
+
+  // Highlight selected location
+  useEffect(() => {
+    if (!selectedLocation || !map.current) return;
+    map.current.setCenter({ lat: selectedLocation.lat, lng: selectedLocation.lng });
+    map.current.setZoom(15);
+  }, [selectedLocation]);
+
   return (
     <div ref={mapContainer} className={cn("w-full h-[500px]", className)} />
   );
 }
+
+export default MapView;

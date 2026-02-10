@@ -31,6 +31,9 @@ export default function Home() {
             <a href="#ods" className="text-sm font-medium hover:text-primary transition">
               ODS 16
             </a>
+            <a href="/mapa" className="text-sm font-medium hover:text-primary transition">
+              Mapa de Servicos
+            </a>
           </div>
         </div>
       </nav>
