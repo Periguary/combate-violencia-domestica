@@ -20,6 +20,7 @@ export interface GovernmentLocation {
   description: string;
   source: string;
   lastUpdated: Date;
+  distance?: number;
 }
 
 interface CacheEntry {

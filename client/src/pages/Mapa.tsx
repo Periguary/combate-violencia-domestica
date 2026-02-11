@@ -4,10 +4,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import MapView from "@/components/Map";
 import { trpc } from "@/lib/trpc";
+import { useGeolocationWithUI } from "@/hooks/useGeolocation";
+import { GeolocationPrompt, GeolocationError, GeolocationStatus } from "@/components/GeolocationPrompt";
 
 /**
  * Mapa Interativo - Delegacias da Mulher e Centros de Referencia
- * Integrado com APIs governamentais para dados atualizados
+ * Com geolocalização automática para mostrar serviços próximos
  * Design: Institutional Minimalism with Purpose
  */
 
@@ -23,20 +25,52 @@ interface MapLocation {
   description: string;
   source?: string;
   lastUpdated?: Date;
+  distance?: number;
+  accuracy?: number;
 }
 
 export default function Mapa() {
   const [selectedLocation, setSelectedLocation] = useState<MapLocation | null>(null);
   const [filterType, setFilterType] = useState<"all" | "deam" | "cras" | "creas">("all");
   const [mapReady, setMapReady] = useState(false);
+  const [useNearby, setUseNearby] = useState(false);
 
-  // Buscar dados de localizações da API
-  const { data: locationsData, isLoading, error, refetch } = trpc.locations.getLocations.useQuery({
-    type: filterType === "all" ? "all" : filterType,
-  });
+  // Gerenciar geolocalização
+  const geo = useGeolocationWithUI();
 
-  const locations = locationsData?.locations || [];
+  // Buscar dados de localizações da API (todos os dados)
+  const { data: locationsData, isLoading, error, refetch } = trpc.locations.getLocations.useQuery(
+    {
+      type: filterType === "all" ? "all" : filterType,
+    },
+    {
+      enabled: !useNearby || !geo.coordinates,
+    }
+  );
+
+  // Buscar localizações próximas se temos coordenadas
+  const { data: nearbyData, isLoading: nearbyLoading } = trpc.locations.getNearby.useQuery(
+    {
+      lat: geo.coordinates?.latitude || 0,
+      lng: geo.coordinates?.longitude || 0,
+      radiusKm: 25,
+      type: filterType === "all" ? "all" : filterType,
+    },
+    {
+      enabled: useNearby && !!geo.coordinates,
+    }
+  );
+
+  // Usar dados de proximidade se disponíveis, caso contrário usar todos os dados
+  useEffect(() => {
+    if (geo.coordinates) {
+      setUseNearby(true);
+    }
+  }, [geo.coordinates]);
+
+  const locations = useNearby && nearbyData?.locations ? nearbyData.locations : locationsData?.locations || [];
   const filteredLocations = locations;
+  const isLoadingData = useNearby ? nearbyLoading : isLoading;
 
   const getTypeLabel = (type: string) => {
     switch (type) {
@@ -113,28 +147,28 @@ export default function Mapa() {
               onClick={() => setFilterType("all")}
               className="rounded-full"
             >
-              Todos ({locations.length})
+              Todos ({filteredLocations.length})
             </Button>
             <Button
               variant={filterType === "deam" ? "default" : "outline"}
               onClick={() => setFilterType("deam")}
               className="rounded-full"
             >
-              Delegacias ({locations.filter((l) => l.type === "deam").length})
+              Delegacias ({filteredLocations.filter((l) => l.type === "deam").length})
             </Button>
             <Button
               variant={filterType === "cras" ? "default" : "outline"}
               onClick={() => setFilterType("cras")}
               className="rounded-full"
             >
-              CRAS ({locations.filter((l) => l.type === "cras").length})
+              CRAS ({filteredLocations.filter((l) => l.type === "cras").length})
             </Button>
             <Button
               variant={filterType === "creas" ? "default" : "outline"}
               onClick={() => setFilterType("creas")}
               className="rounded-full"
             >
-              CREAS ({locations.filter((l) => l.type === "creas").length})
+              CREAS ({filteredLocations.filter((l) => l.type === "creas").length})
             </Button>
 
             {/* Refresh Button */}
@@ -142,11 +176,11 @@ export default function Mapa() {
               variant="ghost"
               size="sm"
               onClick={() => refetch()}
-              disabled={isLoading}
+              disabled={isLoadingData}
               className="ml-auto"
               title="Atualizar dados das APIs governamentais"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${isLoadingData ? "animate-spin" : ""}`} />
             </Button>
           </div>
         </div>
@@ -158,12 +192,37 @@ export default function Mapa() {
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Map */}
             <div className="lg:col-span-2">
+              {/* Geolocation Prompts */}
+              {geo.showPrompt && !geo.coordinates && (
+                <GeolocationPrompt
+                  onAllow={geo.handleRequestPermission}
+                  onDeny={geo.handleDenyPermission}
+                  loading={geo.loading}
+                />
+              )}
+
+              {geo.error && (
+                <GeolocationError
+                  error={geo.error}
+                  onRetry={geo.requestPermission}
+                />
+              )}
+
+              {geo.coordinates && (
+                <GeolocationStatus
+                  coordinates={geo.coordinates}
+                  onClear={geo.clearLocation}
+                />
+              )}
+
               <Card className="p-0 overflow-hidden h-96 lg:h-[600px] shadow-lg relative">
-                {isLoading ? (
+                {isLoadingData ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
                     <div className="flex flex-col items-center gap-2">
                       <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                      <p className="text-sm text-muted-foreground">Carregando dados...</p>
+                      <p className="text-sm text-muted-foreground">
+                        {useNearby ? "Buscando serviços próximos..." : "Carregando dados..."}
+                      </p>
                     </div>
                   </div>
                 ) : null}
@@ -176,9 +235,14 @@ export default function Mapa() {
               </Card>
               <div className="mt-4 text-sm text-muted-foreground">
                 <p>Clique nos marcadores do mapa para ver detalhes. Use o zoom para explorar diferentes areas.</p>
-                {locationsData?.lastUpdate && (
+                {useNearby && geo.coordinates && (
+                  <p className="mt-2 text-xs text-accent">
+                    Mostrando serviços em um raio de 25km de sua localização
+                  </p>
+                )}
+                {(locationsData?.lastUpdate || nearbyData?.lastUpdate) && (
                   <p className="mt-2 text-xs">
-                    Ultima atualizacao: {new Date(locationsData.lastUpdate).toLocaleString("pt-BR")}
+                    Ultima atualizacao: {new Date(locationsData?.lastUpdate || nearbyData?.lastUpdate || new Date()).toLocaleString("pt-BR")}
                   </p>
                 )}
               </div>
@@ -188,7 +252,7 @@ export default function Mapa() {
             <div className="lg:col-span-1">
               <div className="space-y-4">
                 <h3 className="text-lg font-bold text-primary">
-                  {isLoading ? (
+                  {isLoadingData ? (
                     <span className="flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Carregando...
@@ -213,9 +277,13 @@ export default function Mapa() {
                 )}
 
                 <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                  {filteredLocations.length === 0 && !isLoading ? (
+                  {filteredLocations.length === 0 && !isLoadingData ? (
                     <Card className="p-4 text-center text-muted-foreground">
-                      <p>Nenhum servico encontrado para o filtro selecionado.</p>
+                      <p>
+                        {useNearby
+                          ? "Nenhum servico encontrado próximo de sua localização."
+                          : "Nenhum servico encontrado para o filtro selecionado."}
+                      </p>
                     </Card>
                   ) : (
                     filteredLocations.map((location) => (
@@ -233,6 +301,12 @@ export default function Mapa() {
                           <div className="flex-1 min-w-0">
                             <h4 className="font-semibold text-sm truncate">{location.name}</h4>
                             <p className="text-xs text-muted-foreground mt-1">{getTypeLabel(location.type)}</p>
+
+                            {location.distance !== undefined && (
+                              <p className="text-xs text-accent font-medium mt-1">
+                                {location.distance.toFixed(1)} km de distância
+                              </p>
+                            )}
 
                             {location.phone && (
                               <div className="flex items-center gap-1 mt-2 text-xs text-foreground">
