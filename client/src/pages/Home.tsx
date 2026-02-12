@@ -261,6 +261,18 @@ export default function Home() {
                 <p className="text-xs text-muted-foreground mt-2">Procure o mais proximo de voce</p>
               </div>
             </Card>
+
+            <Card className="p-8 border-l-4 border-l-primary bg-primary/5">
+              <h3 className="text-xl font-bold text-primary mb-4">Denuncia Anonima</h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                Registre sua denuncia de forma segura e criptografada. Seus dados sao 100% anonimos e protegidos.
+              </p>
+              <a href="/denuncia" className="inline-block w-full">
+                <Button className="w-full bg-primary hover:bg-primary/90 text-white font-semibold">
+                  Fazer Denuncia Anonima
+                </Button>
+              </a>
+            </Card>
           </div>
 
           <div className="mt-12 bg-primary/5 border border-primary/20 rounded-lg p-8">
