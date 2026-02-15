@@ -215,7 +215,7 @@ export default function Mapa() {
                 />
               )}
 
-              <Card className="p-0 overflow-hidden h-96 lg:h-[600px] shadow-lg relative">
+              <Card className="p-0 overflow-hidden h-96 lg:h-[600px] shadow-lg relative" style={{ height: "600px" }}>
                 {isLoadingData ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
                     <div className="flex flex-col items-center gap-2">

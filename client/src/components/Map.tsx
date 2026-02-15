@@ -230,7 +230,7 @@ export function MapView({
   }, [selectedLocation]);
 
   return (
-    <div ref={mapContainer} className={cn("w-full h-[500px]", className)} />
+    <div ref={mapContainer} className={cn("w-full h-full min-h-[400px]", className)} style={{ height: "100%", minHeight: "400px" }} />
   );
 }
 
