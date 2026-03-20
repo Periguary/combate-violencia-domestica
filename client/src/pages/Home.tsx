@@ -478,7 +478,6 @@ export default function Home() {
           <div className="border-t border-white/20 pt-8 text-center text-sm opacity-75">
             <p>© 2026 Combate a Violencia Domestica. Todos os direitos reservados.</p>
             <p className="mt-2">Desenvolvido como Projeto de Ensino Extensionista | Instituição: IR Serviços</p>
-            <p className="mt-1">Prazo Final de Adesão: 31/12/2028</p>
           </div>
         </div>
       </footer>
